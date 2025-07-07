@@ -1,0 +1,368 @@
+name: Deploy CLOAKED Protocol Documentation
+
+on:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Create package.json and install marked
+      run: |
+        cat > package.json << 'EOF'
+        {
+          "name": "cloaked-docs-builder",
+          "version": "1.0.0",
+          "dependencies": {
+            "marked": "^9.1.0"
+          }
+        }
+        EOF
+        npm install
+    
+    - name: Create HTML structure
+      run: |
+        mkdir -p _site
+        mkdir -p _site/styles
+        mkdir -p _site/icons
+        mkdir -p _site/introduction
+        mkdir -p _site/technical
+        mkdir -p _site/economics
+        mkdir -p _site/governance
+        mkdir -p _site/use-cases
+        mkdir -p _site/resources
+    
+    - name: Copy CSS files
+      run: |
+        cp -r styles/* _site/styles/
+    
+    - name: Copy favicon icons
+      run: |
+        cp -r icons/* _site/icons/
+    
+    - name: Convert markdown to HTML
+      run: |
+        # Create the HTML converter script
+        cat > convert.js << 'EOF'
+        const fs = require('fs');
+        const { marked } = require('marked');
+        
+        // HTML template with cyber styling and TOC
+        const template = `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{{TITLE}} - CLOAKED Protocol</title>
+            <link rel="stylesheet" href="{{CSS_PATH}}styles/website.css">
+            <link rel="icon" type="image/png" sizes="32x32" href="{{CSS_PATH}}icons/icon-32x32.png">
+            <link rel="icon" type="image/png" sizes="96x96" href="{{CSS_PATH}}icons/icon-96x96.png">
+            <link rel="icon" type="image/png" sizes="128x128" href="{{CSS_PATH}}icons/icon-128x128.png">
+            <link rel="apple-touch-icon" sizes="128x128" href="{{CSS_PATH}}icons/icon-128x128.png">
+        </head>
+        <body>
+            <!-- Mobile header (only visible on mobile) -->
+            <div class="mobile-header">
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="mobile-header-title">CLOAKED</div>
+            </div>
+            <!-- Mobile overlay -->
+            <div class="mobile-overlay" id="mobile-overlay"></div>
+            <div class="book-body">
+                <div class="body-inner">
+                    <nav class="book-summary" id="book-summary">
+                        <div class="cloaked-header">
+                            <div class="ai-eye-logo">
+                                <div class="eye-container">
+                                    <div class="outer-ring">
+                                        <div class="inner-ring">
+                                            <div class="pupil"></div>
+                                        </div>
+                                    </div>
+                                    <div class="scan-line-h"></div>
+                                    <div class="scan-line-v"></div>
+                                    <div class="center-flash"></div>
+                                </div>
+                            </div>
+                            <div class="brand-text">
+                                <div class="main-brand">
+                                    <span class="cloaked-text">CLOAKED</span>
+                                </div>
+                                <div class="protocol-text">PROTOCOL</div>
+                            </div>
+                        </div>
+                        <ul class="summary">
+                            <li><a href="{{ROOT_PATH}}index.html">Home</a></li>
+                            <li><a href="{{ROOT_PATH}}introduction/abstract.html">Abstract</a></li>
+                            <li><a href="{{ROOT_PATH}}introduction/overview.html">Overview</a></li>
+                            <li><a href="{{ROOT_PATH}}technical/architecture.html">Architecture</a></li>
+                            <li><a href="{{ROOT_PATH}}use-cases/transfers.html">Transfers</a></li>
+                            <li><a href="{{ROOT_PATH}}economics/fees.html">Fees</a></li>
+                            <li><a href="{{ROOT_PATH}}economics/staking.html">Staking</a></li>
+                            <li><a href="{{ROOT_PATH}}economics/api.html">API</a></li>
+                            <li><a href="{{ROOT_PATH}}economics/tokenomics.html">Tokenomics</a></li>
+                            <li><a href="{{ROOT_PATH}}governance/roadmap.html">Roadmap</a></li>
+                            <li><a href="{{ROOT_PATH}}resources/conclusion.html">Conclusion</a></li>
+                        </ul>
+                    </nav>
+                    <div class="book-content">
+                        {{CONTENT}}
+                    </div>
+                    <aside class="book-toc">
+                        <div class="toc-header">
+                            <h4>On This Page</h4>
+                        </div>
+                        <nav class="toc-nav">
+                            <ul id="toc-list">
+                                <!-- TOC will be populated by JavaScript -->
+                            </ul>
+                        </nav>
+                    </aside>
+                </div>
+            </div>
+            <script>
+                // Generate Table of Contents
+                document.addEventListener('DOMContentLoaded', function() {
+                    const tocList = document.getElementById('toc-list');
+                    const headings = document.querySelectorAll('.book-content h1, .book-content h2, .book-content h3, .book-content h4, .book-content h5, .book-content h6');
+                    
+                    if (headings.length === 0) {
+                        document.querySelector('.book-toc').style.display = 'none';
+                        return;
+                    }
+                    
+                    headings.forEach((heading, index) => {
+                        // Create unique ID for the heading
+                        const id = heading.textContent.toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-+|-+$/g, '');
+                        heading.id = id;
+                        
+                        // Create TOC item
+                        const li = document.createElement('li');
+                        li.className = 'toc-item toc-' + heading.tagName.toLowerCase();
+                        
+                        const a = document.createElement('a');
+                        a.href = '#' + id;
+                        a.textContent = heading.textContent;
+                        a.className = 'toc-link';
+                        
+                        li.appendChild(a);
+                        tocList.appendChild(li);
+                        
+                        // Add click handler for smooth scrolling
+                        a.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const target = document.getElementById(id);
+                            if (target) {
+                                target.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'start'
+                                });
+                                
+                                // Update active state
+                                document.querySelectorAll('.toc-link').forEach(link => {
+                                    link.classList.remove('active');
+                                });
+                                a.classList.add('active');
+                            }
+                        });
+                    });
+                    
+                    // Highlight current section on scroll
+                    const observerOptions = {
+                        rootMargin: '-100px 0px -66%',
+                        threshold: 0
+                    };
+                    
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                const id = entry.target.id;
+                                document.querySelectorAll('.toc-link').forEach(link => {
+                                    link.classList.remove('active');
+                                });
+                                const activeLink = document.querySelector('.toc-link[href="#' + id + '"]');
+                                if (activeLink) {
+                                    activeLink.classList.add('active');
+                                }
+                            }
+                        });
+                    }, observerOptions);
+                    
+                    headings.forEach(heading => {
+                        observer.observe(heading);
+                    });
+                    
+                    // Highlight current page in navigation
+                    const currentPath = window.location.pathname;
+                    const currentFile = currentPath.split('/').pop() || 'index.html';
+                    const navLinks = document.querySelectorAll('.book-summary ul.summary li a');
+                    
+                    navLinks.forEach(link => {
+                        const linkPath = link.getAttribute('href');
+                        const linkFile = linkPath.split('/').pop();
+                        
+                        // Check if current page matches the link
+                        if (linkFile === currentFile || 
+                            (currentFile === '' && linkFile === 'index.html') ||
+                            (currentPath === '/' && linkFile === 'index.html') ||
+                            currentPath.endsWith(linkPath)) {
+                            link.classList.add('current-page');
+                        }
+                    });
+                    
+                    // Mobile menu functionality
+                    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+                    const bookSummary = document.getElementById('book-summary');
+                    const mobileOverlay = document.getElementById('mobile-overlay');
+                    
+                    if (mobileMenuToggle && bookSummary) {
+                        mobileMenuToggle.addEventListener('click', function() {
+                            // Toggle mobile menu
+                            mobileMenuToggle.classList.toggle('active');
+                            bookSummary.classList.toggle('mobile-open');
+                            if (mobileOverlay) {
+                                mobileOverlay.classList.toggle('active');
+                            }
+                            
+                            // Prevent body scroll when menu is open
+                            if (bookSummary.classList.contains('mobile-open')) {
+                                document.body.classList.add('mobile-menu-open');
+                            } else {
+                                document.body.classList.remove('mobile-menu-open');
+                            }
+                        });
+                        
+                        // Close mobile menu when clicking on a link
+                        const mobileNavLinks = bookSummary.querySelectorAll('a');
+                        mobileNavLinks.forEach(link => {
+                            link.addEventListener('click', function() {
+                                mobileMenuToggle.classList.remove('active');
+                                bookSummary.classList.remove('mobile-open');
+                                if (mobileOverlay) {
+                                    mobileOverlay.classList.remove('active');
+                                }
+                                document.body.classList.remove('mobile-menu-open');
+                            });
+                        });
+                        
+                        // Close mobile menu when clicking outside or on overlay
+                        document.addEventListener('click', function(e) {
+                            if ((!bookSummary.contains(e.target) && !mobileMenuToggle.contains(e.target)) || 
+                                (mobileOverlay && e.target === mobileOverlay)) {
+                                mobileMenuToggle.classList.remove('active');
+                                bookSummary.classList.remove('mobile-open');
+                                if (mobileOverlay) {
+                                    mobileOverlay.classList.remove('active');
+                                }
+                                document.body.classList.remove('mobile-menu-open');
+                            }
+                        });
+                        
+                        // Close mobile menu on escape key
+                        document.addEventListener('keydown', function(e) {
+                            if (e.key === 'Escape' && bookSummary.classList.contains('mobile-open')) {
+                                mobileMenuToggle.classList.remove('active');
+                                bookSummary.classList.remove('mobile-open');
+                                if (mobileOverlay) {
+                                    mobileOverlay.classList.remove('active');
+                                }
+                                document.body.classList.remove('mobile-menu-open');
+                            }
+                        });
+                        
+                        // Handle window resize
+                        window.addEventListener('resize', function() {
+                            if (window.innerWidth > 768) {
+                                mobileMenuToggle.classList.remove('active');
+                                bookSummary.classList.remove('mobile-open');
+                                if (mobileOverlay) {
+                                    mobileOverlay.classList.remove('active');
+                                }
+                                document.body.classList.remove('mobile-menu-open');
+                            }
+                        });
+                    }
+                });
+            </script>
+        </body>
+        </html>`;
+        
+        // Convert files
+        const files = [
+            { src: 'README.md', dest: '_site/index.html', title: 'Home', root: '' },
+            { src: 'introduction/abstract.md', dest: '_site/introduction/abstract.html', title: 'Abstract', root: '../' },
+            { src: 'introduction/overview.md', dest: '_site/introduction/overview.html', title: 'Overview', root: '../' },
+            { src: 'technical/architecture.md', dest: '_site/technical/architecture.html', title: 'Architecture', root: '../' },
+            { src: 'use-cases/transfers.md', dest: '_site/use-cases/transfers.html', title: 'Transfers', root: '../' },
+            { src: 'economics/fees.md', dest: '_site/economics/fees.html', title: 'Fees', root: '../' },
+            { src: 'economics/staking.md', dest: '_site/economics/staking.html', title: 'Staking', root: '../' },
+            { src: 'economics/api.md', dest: '_site/economics/api.html', title: 'API', root: '../' },
+            { src: 'economics/tokenomics.md', dest: '_site/economics/tokenomics.html', title: 'Tokenomics', root: '../' },
+            { src: 'governance/roadmap.md', dest: '_site/governance/roadmap.html', title: 'Roadmap', root: '../' },
+            { src: 'resources/conclusion.md', dest: '_site/resources/conclusion.html', title: 'Conclusion', root: '../' }
+        ];
+        
+        files.forEach(file => {
+            if (fs.existsSync(file.src)) {
+                const markdown = fs.readFileSync(file.src, 'utf8');
+                const html = marked(markdown);
+                const finalHtml = template
+                    .replace(/{{TITLE}}/g, file.title)
+                    .replace(/{{CSS_PATH}}/g, file.root)
+                    .replace(/{{ROOT_PATH}}/g, file.root)
+                    .replace('{{CONTENT}}', html);
+                fs.writeFileSync(file.dest, finalHtml);
+                console.log(`Generated ${file.dest}`);
+            } else {
+                console.log(`Warning: ${file.src} not found, skipping`);
+            }
+        });
+        
+        console.log('All files converted successfully!');
+        EOF
+        
+        node convert.js
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '_site'
+    
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4 

@@ -1,0 +1,50 @@
+{
+  "title": "CLOAKED Protocol Documentation",
+  "description": "Advanced AI-powered privacy framework for anonymous cross-chain asset transfers",
+  "author": "CLOAKED Protocol Team",
+  "language": "en",
+  "gitbook": "3.2.3",
+  "plugins": [
+    "theme-default",
+    "prism", 
+    "copy-code-button",
+    "expandable-chapters"
+  ],
+  "pluginsConfig": {
+    "theme-default": {
+      "showLevel": true,
+      "styles": {
+        "website": "styles/website.css"
+      }
+    }
+  },
+  "links": {
+    "sidebar": {
+      "CLOAKED Protocol": "https://github.com/CLOAKEDProtocol/CLOAKED"
+    }
+  },
+  "assets": {
+    "favicon": {
+      "ico": "icons/icon-32x32.png",
+      "png": "icons/icon-32x32.png",
+      "apple-icon": "icons/icon-128x128.png",
+      "apple-icon-precomposed": "icons/icon-128x128.png"
+    }
+  },
+  "variables": {
+    "protocol": "CLOAKED",
+    "token": "$CLOAK",
+    "version": "1.0.0"
+  },
+  "pdf": {
+    "fontSize": 12,
+    "fontFamily": "Arial",
+    "paperSize": "a4",
+    "margin": {
+      "right": 62,
+      "left": 62,
+      "top": 36,
+      "bottom": 36
+    }
+  }
+} 

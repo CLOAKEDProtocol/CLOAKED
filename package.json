@@ -1,0 +1,34 @@
+{
+  "name": "cloaked-protocol-docs",
+  "version": "1.0.0",
+  "description": "CLOAKED Protocol Documentation - Advanced AI-powered privacy framework",
+  "main": "index.js",
+  "scripts": {
+    "install": "gitbook install",
+    "serve": "gitbook serve",
+    "build": "gitbook build",
+    "deploy": "npm run build && gh-pages -d _book"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CLOAKEDProtocol/CLOAKED.git"
+  },
+  "keywords": [
+    "cloaked",
+    "protocol",
+    "privacy",
+    "blockchain",
+    "defi",
+    "documentation",
+    "gitbook"
+  ],
+  "author": "CLOAKED Protocol Team",
+  "license": "MIT",
+  "devDependencies": {
+    "gh-pages": "^6.0.0",
+    "gitbook-cli": "^2.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 
